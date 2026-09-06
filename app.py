@@ -1015,11 +1015,14 @@ def render_temporal_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataF
     with tab2:
         col1, col2 = st.columns(2)
         with col1:
-            años_disponibles = sorted(df_delitos_f['año'].unique(), reverse=True)
-            año_sel = st.selectbox("Año para heatmap (Delitos)", años_disponibles, key="heatmap_year_del")
-            fig = plot_heatmap_calendar(df_delitos_f, 'fecha', 'cantidad', 
-                                        f'Heatmap Mensual - Delitos {año_sel}', año_sel)
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            if not df_delitos_f.empty:
+                años_disponibles = sorted(df_delitos_f['año'].unique(), reverse=True)
+                año_sel = st.selectbox("Año para heatmap (Delitos)", años_disponibles, key="heatmap_year_del")
+                fig = plot_heatmap_calendar(df_delitos_f, 'fecha', 'cantidad', 
+                                            f'Heatmap Mensual - Delitos {año_sel}', año_sel)
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de delitos para los filtros actuales.")
         
         with col2:
             if not df_domestic_f.empty:
@@ -1028,6 +1031,8 @@ def render_temporal_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataF
                 fig = plot_heatmap_calendar(df_domestic_f, 'fecha_hecho', 'cantidad',
                                             f'Heatmap Mensual - VI Específica {año_sel_dom}', año_sel_dom)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de VI específica para los filtros actuales.")
     
     with tab3:
         # Comparativo anual apilado
