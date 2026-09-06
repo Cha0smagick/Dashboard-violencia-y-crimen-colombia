@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 import kagglehub
 from kagglehub import KaggleDatasetAdapter
+import os
 
 # Streamlit debe importarse antes de usar @st.cache_data
 import streamlit as st
@@ -21,6 +22,47 @@ DATA_DIR.mkdir(exist_ok=True)
 
 DELITOS_PATH = DATA_DIR / "delitos_colombia.pkl"
 DOMESTIC_PATH = DATA_DIR / "domestic_violence_colombia.pkl"
+
+
+def _configure_kaggle_credentials() -> bool:
+    """Configura credenciales Kaggle desde st.secrets o variables de entorno.
+    Retorna True si están disponibles, False si faltan."""
+    # Prioridad: st.secrets > env vars > ~/.kaggle/kaggle.json
+    username = st.secrets.get("KAGGLE_USERNAME", os.environ.get("KAGGLE_USERNAME", ""))
+    key = st.secrets.get("KAGGLE_KEY", os.environ.get("KAGGLE_KEY", ""))
+    
+    if username and key:
+        os.environ["KAGGLE_USERNAME"] = username
+        os.environ["KAGGLE_KEY"] = key
+        return True
+    
+    # Verificar si existe ~/.kaggle/kaggle.json
+    kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+    if kaggle_json.exists():
+        return True
+    
+    return False
+
+
+def _show_kaggle_error(dataset_name: str) -> None:
+    """Muestra error amigable cuando faltan credenciales Kaggle."""
+    st.error(f"""
+    ❌ **Credenciales de Kaggle requeridas** para descargar `{dataset_name}`
+    
+    **En Streamlit Cloud:** Ve a **Manage app → Settings → Secrets** y agrega:
+    ```toml
+    KAGGLE_USERNAME = "cha0smagick"
+    KAGGLE_KEY = "KGAT_0eadfea8127585d36cd300b2d9cb65e0"
+    ```
+    
+    **En local:** Crea `~/.kaggle/kaggle.json` con:
+    ```json
+    {{"username": "cha0smagick", "key": "KGAT_0eadfea8127585d36cd300b2d9cb65e0"}}
+    ```
+    
+    Obtén tu token en: https://www.kaggle.com/settings/account
+    """)
+    st.stop()
 
 
 def normalize_text(series: pd.Series) -> pd.Series:
@@ -38,15 +80,22 @@ def normalize_text(series: pd.Series) -> pd.Series:
 @st.cache_data(show_spinner="Cargando dataset de delitos (2.38M registros)...")
 def load_delitos() -> pd.DataFrame:
     """Carga y preprocesa el dataset general de delitos."""
+    if not _configure_kaggle_credentials():
+        _show_kaggle_error("leonardoariasalemn/delitos-colombia")
+    
     if DELITOS_PATH.exists():
         df = pd.read_pickle(DELITOS_PATH)
     else:
-        df = kagglehub.load_dataset(
-            KaggleDatasetAdapter.PANDAS,
-            "leonardoariasalemn/delitos-colombia",
-            ""
-        )
-        df.to_pickle(DELITOS_PATH)
+        try:
+            df = kagglehub.load_dataset(
+                KaggleDatasetAdapter.PANDAS,
+                "leonardoariasalemn/delitos-colombia",
+                ""
+            )
+            df.to_pickle(DELITOS_PATH)
+        except Exception as e:
+            st.error(f"Error descargando dataset: {e}")
+            _show_kaggle_error("leonardoariasalemn/delitos-colombia")
     
     # Preprocesamiento
     df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')
@@ -71,15 +120,22 @@ def load_delitos() -> pd.DataFrame:
 @st.cache_data(show_spinner="Cargando dataset de violencia intrafamiliar (575K registros)...")
 def load_domestic_violence() -> pd.DataFrame:
     """Carga y preprocesa el dataset específico de violencia intrafamiliar."""
+    if not _configure_kaggle_credentials():
+        _show_kaggle_error("estiven0507/domestic-violence-in-colombia")
+    
     if DOMESTIC_PATH.exists():
         df = pd.read_pickle(DOMESTIC_PATH)
     else:
-        df = kagglehub.load_dataset(
-            KaggleDatasetAdapter.PANDAS,
-            "estiven0507/domestic-violence-in-colombia",
-            ""
-        )
-        df.to_pickle(DOMESTIC_PATH)
+        try:
+            df = kagglehub.load_dataset(
+                KaggleDatasetAdapter.PANDAS,
+                "estiven0507/domestic-violence-in-colombia",
+                ""
+            )
+            df.to_pickle(DOMESTIC_PATH)
+        except Exception as e:
+            st.error(f"Error descargando dataset: {e}")
+            _show_kaggle_error("estiven0507/domestic-violence-in-colombia")
     
     # Preprocesamiento
     df['fecha_hecho'] = pd.to_datetime(df['fecha_hecho'], dayfirst=True, format='mixed', errors='coerce')

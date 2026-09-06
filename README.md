@@ -15,12 +15,12 @@ Dashboard interactivo de **nivel científico** para el análisis exploratorio y 
 
 ## 🌐 Demo Live
 
-**¿Quieres verlo funcionando sin instalar nada?**  
-Despliega en **Streamlit Community Cloud** (gratis, 2 min):
+**Dashboard desplegado y funcionando:**  
+🔗 **https://dashboard-violencia-y-crimen-colombia-8zvhdp43hnr3mc6uspk63a.streamlit.app/**
 
-[![Deploy to Streamlit](https://streamlit.io/images/deploy-button.svg)](https://share.streamlit.io/deploy?repository=Cha0smagick/Dashboard-violencia-y-crimen-colombia)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://dashboard-violencia-y-crimen-colombia-8zvhdp43hnr3mc6uspk63a.streamlit.app/)
 
-> **URL esperada:** `https://dashboard-violencia-y-crimen-colombia.streamlit.app`
+> **Nota:** La primera carga tarda ~30-60s mientras descarga los datasets de Kaggle (2.38M + 575K registros). Luego queda en caché.
 
 ---
 
