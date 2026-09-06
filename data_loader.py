@@ -90,7 +90,7 @@ def load_delitos() -> pd.DataFrame:
             df = kagglehub.load_dataset(
                 KaggleDatasetAdapter.PANDAS,
                 "leonardoariasalemn/delitos-colombia",
-                ""
+                "v_delitos.csv"
             )
             df.to_pickle(DELITOS_PATH)
         except Exception as e:
@@ -130,7 +130,7 @@ def load_domestic_violence() -> pd.DataFrame:
             df = kagglehub.load_dataset(
                 KaggleDatasetAdapter.PANDAS,
                 "estiven0507/domestic-violence-in-colombia",
-                ""
+                "raw_data.csv"
             )
             df.to_pickle(DOMESTIC_PATH)
         except Exception as e:
