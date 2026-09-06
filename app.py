@@ -45,32 +45,6 @@ from data_loader import (
 )
 
 # ════════════════════════════════════════════════════════════════════════════════
-# DIAGNÓSTICO TEMPRANO (solo en cloud para debug)
-# ════════════════════════════════════════════════════════════════════════════════
-try:
-    import kagglehub
-    st.write(f"✅ kagglehub version: {kagglehub.__version__}")
-except Exception as e:
-    st.error(f"❌ kagglehub import failed: {e}")
-
-# Verificar secrets
-try:
-    has_secrets = hasattr(st, 'secrets') and len(st.secrets) > 0
-    st.write(f"✅ st.secrets disponible: {has_secrets}")
-    if has_secrets:
-        kaggle_user = st.secrets.get("KAGGLE_USERNAME", "NO ENCONTRADO")
-        kaggle_key = st.secrets.get("KAGGLE_KEY", "NO ENCONTRADO")
-        st.write(f"   KAGGLE_USERNAME: {kaggle_user[:10] if kaggle_user != 'NO ENCONTRADO' else kaggle_user}...")
-        st.write(f"   KAGGLE_KEY: {kaggle_key[:10] if kaggle_key != 'NO ENCONTRADO' else kaggle_key}...")
-except Exception as e:
-    st.error(f"❌ Error leyendo secrets: {e}")
-
-# Verificar directorio data
-from pathlib import Path
-data_dir = Path(__file__).parent / "data"
-st.write(f"✅ data dir exists: {data_dir.exists()}, writable: {os.access(data_dir.parent, os.W_OK) if data_dir.parent.exists() else 'N/A'}")
-
-# ════════════════════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ════════════════════════════════════════════════════════════════════════════════
 
