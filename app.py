@@ -1091,18 +1091,25 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
     """Análisis geográfico."""
     st.markdown('<div class="section-header"><span class="icon">🗺️</span><h2>Análisis Geográfico</h2><div class="divider"></div></div>', unsafe_allow_html=True)
     
+    if df_delitos_f.empty and df_domestic_f.empty:
+        st.warning("⚠️ No hay datos geográficos para los filtros seleccionados.")
+        return
+    
     tab1, tab2, tab3 = st.tabs(["🏆 Top Departamentos", "🌳 Composición (Treemap)", "🔍 Detalle Municipal"])
     
     with tab1:
         col1, col2 = st.columns(2)
         
         with col1:
-            fig = plot_top_categories(
-                df_delitos_f, 'departamento', 'cantidad',
-                'Top 15 Departamentos - Delitos Generales',
-                top_n=15
-            )
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            if not df_delitos_f.empty:
+                fig = plot_top_categories(
+                    df_delitos_f, 'departamento', 'cantidad',
+                    'Top 15 Departamentos - Delitos Generales',
+                    top_n=15
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de delitos para los filtros actuales.")
         
         with col2:
             if not df_domestic_f.empty:
@@ -1112,6 +1119,8 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
                     top_n=15
                 )
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de VI específica para los filtros actuales.")
     
     with tab2:
         col1, col2 = st.columns(2)
@@ -1123,6 +1132,8 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
                     'Composición Delitos por Departamento y Tipo'
                 )
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de delitos para los filtros actuales.")
         
         with col2:
             if not df_domestic_f.empty:
@@ -1131,6 +1142,8 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
                     'VI Específica: Dept. × Armas/Medios'
                 )
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de VI específica para los filtros actuales.")
     
     with tab3:
         # Selector de departamento para detalle municipal
@@ -1275,8 +1288,13 @@ def render_correlation_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Da
     """Análisis de correlación y validación cruzada."""
     st.markdown('<div class="section-header"><span class="icon">🔗</span><h2>Validación Cruzada y Correlaciones</h2><div class="divider"></div></div>', unsafe_allow_html=True)
     
-    # Preparar datos para correlación a nivel departamental
-    if not df_delitos_f.empty and not df_domestic_f.empty:
+    # Validación temprana
+    if df_delitos_f.empty or df_domestic_f.empty:
+        st.warning("⚠️ No hay datos suficientes en uno o ambos datasets para el análisis de correlación.")
+        return
+    
+    try:
+        # Preparar datos para correlación a nivel departamental
         # Agregar por departamento
         dep_del = df_delitos_f.groupby('departamento_norm').agg(
             total_delitos=('cantidad', 'sum'),
@@ -1290,10 +1308,22 @@ def render_correlation_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Da
         # Merge
         dep_merged = dep_del.merge(dep_dom, on='departamento_norm', how='outer').fillna(0)
         
+        # Verificar que hay datos después del merge
+        if dep_merged.empty:
+            st.warning("⚠️ No hay departamentos en común entre los datasets filtrados.")
+            return
+        
         # Mapear nombres bonitos
         dep_names = dict(zip(df_delitos_f['departamento_norm'], df_delitos_f['departamento']))
         dep_names.update(dict(zip(df_domestic_f['departamento_norm'], df_domestic_f['departamento'])))
         dep_merged['departamento'] = dep_merged['departamento_norm'].map(dep_names)
+        
+        # Verificar columnas necesarias para scatter
+        required_cols = ['vi_general', 'vi_especifica', 'total_delitos', 'departamento']
+        missing_cols = [c for c in required_cols if c not in dep_merged.columns]
+        if missing_cols:
+            st.warning(f"⚠️ Columnas faltantes para correlación: {missing_cols}")
+            return
         
         col1, col2 = st.columns(2)
         
@@ -1334,36 +1364,48 @@ def render_correlation_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Da
         # Tabla de correlación
         st.markdown("#### 📋 Tabla de Validación por Departamento")
         display_cols = ['departamento', 'total_delitos', 'vi_general', 'vi_especifica', 'ratio']
-        dep_display = dep_merged[display_cols].copy()
-        dep_display.columns = ['Departamento', 'Total Delitos', 'VI General', 'VI Específica', 'Ratio']
-        dep_display['Ratio'] = dep_display['Ratio'].round(2)
-        dep_display = dep_display.sort_values('Total Delitos', ascending=False)
-        
-        st.dataframe(
-            dep_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Total Delitos": st.column_config.NumberColumn(format="%,.0f"),
-                "VI General": st.column_config.NumberColumn(format="%,.0f"),
-                "VI Específica": st.column_config.NumberColumn(format="%,.0f"),
-                "Ratio": st.column_config.NumberColumn(format="%.2f"),
-            }
-        )
+        # Verificar que todas las columnas existen
+        available_cols = [c for c in display_cols if c in dep_merged.columns]
+        if len(available_cols) == len(display_cols):
+            dep_display = dep_merged[display_cols].copy()
+            dep_display.columns = ['Departamento', 'Total Delitos', 'VI General', 'VI Específica', 'Ratio']
+            dep_display['Ratio'] = dep_display['Ratio'].round(2)
+            dep_display = dep_display.sort_values('Total Delitos', ascending=False)
+            
+            st.dataframe(
+                dep_display,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Total Delitos": st.column_config.NumberColumn(format="%,.0f"),
+                    "VI General": st.column_config.NumberColumn(format="%,.0f"),
+                    "VI Específica": st.column_config.NumberColumn(format="%,.0f"),
+                    "Ratio": st.column_config.NumberColumn(format="%.2f"),
+                }
+            )
+        else:
+            st.warning(f"⚠️ Columnas faltantes en tabla: {[c for c in display_cols if c not in dep_merged.columns]}")
         
         # Coeficiente de correlación global
         from scipy import stats
-        if len(dep_merged) > 2:
-            r, p = stats.pearsonr(dep_merged['vi_general'], dep_merged['vi_especifica'])
-            st.markdown(f"""
-            <div class="info-box {'success' if r > 0.7 else 'warning' if r > 0.4 else 'error'}">
-                <h4>📊 Correlación Global (Pearson)</h4>
-                <p><strong>r = {r:.3f}</strong> | p-value = {p:.4f}</p>
-                <p>{"Correlación fuerte - Los datasets son consistentes" if r > 0.7 else 
-                   "Correlación moderada - Alguna discrepancia entre fuentes" if r > 0.4 else 
-                   "Correlación débil - Datasets miden fenómenos diferentes"}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        if len(dep_merged) > 2 and 'vi_general' in dep_merged.columns and 'vi_especifica' in dep_merged.columns:
+            try:
+                r, p = stats.pearsonr(dep_merged['vi_general'], dep_merged['vi_especifica'])
+                st.markdown(f"""
+                <div class="info-box {'success' if r > 0.7 else 'warning' if r > 0.4 else 'error'}">
+                    <h4>📊 Correlación Global (Pearson)</h4>
+                    <p><strong>r = {r:.3f}</strong> | p-value = {p:.4f}</p>
+                    <p>{"Correlación fuerte - Los datasets son consistentes" if r > 0.7 else 
+                       "Correlación moderada - Alguna discrepancia entre fuentes" if r > 0.4 else 
+                       "Correlación débil - Datasets miden fenómenos diferentes"}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"⚠️ No se pudo calcular correlación: {e}")
+    except Exception as e:
+        st.error(f"❌ Error en análisis de correlación: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 
 def render_data_tables(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataFrame) -> None:
@@ -1515,5 +1557,61 @@ def main():
     render_footer()
 
 
+# ════════════════════════════════════════════════════════════════════════════════
+# ENTRY POINT CON MANEJO DE ERRORES GLOBAL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def safe_main():
+    """Wrapper seguro para main() con manejo de errores global."""
+    try:
+        # Asegurar directorio de datos existe
+        from pathlib import Path
+        data_dir = Path(__file__).parent / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
+        main()
+    except FileNotFoundError as e:
+        st.error(f"""
+        ❌ **Archivo no encontrado**: {e}
+        
+        Verifica que los datasets se descarguen correctamente de Kaggle.
+        """)
+        st.stop()
+    except PermissionError as e:
+        st.error(f"""
+        ❌ **Error de permisos**: {e}
+        
+        El directorio de datos no es escribible.
+        """)
+        st.stop()
+    except KeyError as e:
+        st.error(f"""
+        ❌ **Columna faltante en datos**: {e}
+        
+        Los datasets pueden haber cambiado de estructura.
+        """)
+        st.stop()
+    except ValueError as e:
+        st.error(f"""
+        ❌ **Error de valor**: {e}
+        
+        Revisa los filtros seleccionados.
+        """)
+        st.stop()
+    except Exception as e:
+        import traceback
+        st.error(f"""
+        ❌ **Error inesperado**: {type(e).__name__}: {e}
+        
+        **Detalles técnicos:**
+        ```
+        {traceback.format_exc()}
+        ```
+        
+        Por favor, reporta este error.
+        """)
+        st.stop()
+
+
 if __name__ == "__main__":
-    main()
+    safe_main()
