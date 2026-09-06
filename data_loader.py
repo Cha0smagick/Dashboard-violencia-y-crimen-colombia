@@ -90,11 +90,17 @@ def _safe_load_dataset(dataset_handle: str, file_name: str, cache_path: Path, sp
         if cache_path.exists():
             return pd.read_pickle(cache_path)
         
-        # Intentar descargar
+        # Intentar descargar con opciones pandas para evitar DtypeWarning
+        pandas_kwargs = {
+            'low_memory': False,
+            'dtype': {'codigo_dane': 'str'}  # Forzar string para columna problemática
+        }
+        
         df = kagglehub.load_dataset(
             KaggleDatasetAdapter.PANDAS,
             dataset_handle,
-            file_name
+            file_name,
+            pandas_kwargs=pandas_kwargs
         )
         df.to_pickle(cache_path)
         return df
