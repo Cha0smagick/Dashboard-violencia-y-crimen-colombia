@@ -11,6 +11,7 @@ from pathlib import Path
 import kagglehub
 from kagglehub import KaggleDatasetAdapter
 import os
+import traceback
 
 # Streamlit debe importarse antes de usar @st.cache_data
 import streamlit as st
@@ -27,21 +28,39 @@ DOMESTIC_PATH = DATA_DIR / "domestic_violence_colombia.pkl"
 def _configure_kaggle_credentials() -> bool:
     """Configura credenciales Kaggle desde st.secrets o variables de entorno.
     Retorna True si están disponibles, False si faltan."""
-    # Prioridad: st.secrets > env vars > ~/.kaggle/kaggle.json
-    username = st.secrets.get("KAGGLE_USERNAME", os.environ.get("KAGGLE_USERNAME", ""))
-    key = st.secrets.get("KAGGLE_KEY", os.environ.get("KAGGLE_KEY", ""))
-    
-    if username and key:
-        os.environ["KAGGLE_USERNAME"] = username
-        os.environ["KAGGLE_KEY"] = key
-        return True
-    
-    # Verificar si existe ~/.kaggle/kaggle.json
-    kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
-    if kaggle_json.exists():
-        return True
-    
-    return False
+    try:
+        # Prioridad: st.secrets > env vars > ~/.kaggle/kaggle.json
+        username = ""
+        key = ""
+        
+        # Intentar leer de st.secrets (Streamlit Cloud)
+        try:
+            if hasattr(st, 'secrets'):
+                username = st.secrets.get("KAGGLE_USERNAME", "")
+                key = st.secrets.get("KAGGLE_KEY", "")
+        except Exception:
+            pass
+        
+        # Fallback a variables de entorno
+        if not username:
+            username = os.environ.get("KAGGLE_USERNAME", "")
+        if not key:
+            key = os.environ.get("KAGGLE_KEY", "")
+        
+        if username and key:
+            os.environ["KAGGLE_USERNAME"] = username
+            os.environ["KAGGLE_KEY"] = key
+            return True
+        
+        # Verificar si existe ~/.kaggle/kaggle.json
+        kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+        if kaggle_json.exists():
+            return True
+        
+        return False
+    except Exception as e:
+        st.error(f"Error configurando credenciales Kaggle: {e}")
+        return False
 
 
 def _show_kaggle_error(dataset_name: str) -> None:
@@ -65,6 +84,46 @@ def _show_kaggle_error(dataset_name: str) -> None:
     st.stop()
 
 
+def _safe_load_dataset(dataset_handle: str, file_name: str, cache_path: Path, spinner_msg: str) -> pd.DataFrame:
+    """Carga dataset con manejo de errores robusto."""
+    try:
+        if cache_path.exists():
+            return pd.read_pickle(cache_path)
+        
+        # Intentar descargar
+        df = kagglehub.load_dataset(
+            KaggleDatasetAdapter.PANDAS,
+            dataset_handle,
+            file_name
+        )
+        df.to_pickle(cache_path)
+        return df
+    except FileNotFoundError:
+        st.error(f"Archivo `{file_name}` no encontrado en dataset `{dataset_handle}`. Verifica el nombre del archivo.")
+        st.stop()
+    except PermissionError:
+        st.error(f"Sin permisos para escribir en `{cache_path}`. Verifica permisos del directorio `data/`.")
+        st.stop()
+    except Exception as e:
+        st.error(f"""
+        **Error descargando dataset `{dataset_handle}`:**
+        ```
+        {type(e).__name__}: {e}
+        ```
+        
+        **Traceback:**
+        ```
+        {traceback.format_exc()}
+        ```
+        
+        Verifica:
+        1. Credenciales Kaggle en Secrets (KAGGLE_USERNAME, KAGGLE_KEY)
+        2. Nombre correcto del archivo: `{file_name}`
+        3. Dataset público/accesible
+        """)
+        st.stop()
+
+
 def normalize_text(series: pd.Series) -> pd.Series:
     """Normaliza texto para joins: minúsculas, sin acentos, sin espacios extra."""
     return (
@@ -83,19 +142,12 @@ def load_delitos() -> pd.DataFrame:
     if not _configure_kaggle_credentials():
         _show_kaggle_error("leonardoariasalemn/delitos-colombia")
     
-    if DELITOS_PATH.exists():
-        df = pd.read_pickle(DELITOS_PATH)
-    else:
-        try:
-            df = kagglehub.load_dataset(
-                KaggleDatasetAdapter.PANDAS,
-                "leonardoariasalemn/delitos-colombia",
-                "v_delitos.csv"
-            )
-            df.to_pickle(DELITOS_PATH)
-        except Exception as e:
-            st.error(f"Error descargando dataset: {e}")
-            _show_kaggle_error("leonardoariasalemn/delitos-colombia")
+    df = _safe_load_dataset(
+        "leonardoariasalemn/delitos-colombia",
+        "v_delitos.csv",
+        DELITOS_PATH,
+        "Cargando dataset de delitos (2.38M registros)..."
+    )
     
     # Preprocesamiento
     df['fecha'] = pd.to_datetime(df['fecha'], errors='coerce')
@@ -123,19 +175,12 @@ def load_domestic_violence() -> pd.DataFrame:
     if not _configure_kaggle_credentials():
         _show_kaggle_error("estiven0507/domestic-violence-in-colombia")
     
-    if DOMESTIC_PATH.exists():
-        df = pd.read_pickle(DOMESTIC_PATH)
-    else:
-        try:
-            df = kagglehub.load_dataset(
-                KaggleDatasetAdapter.PANDAS,
-                "estiven0507/domestic-violence-in-colombia",
-                "raw_data.csv"
-            )
-            df.to_pickle(DOMESTIC_PATH)
-        except Exception as e:
-            st.error(f"Error descargando dataset: {e}")
-            _show_kaggle_error("estiven0507/domestic-violence-in-colombia")
+    df = _safe_load_dataset(
+        "estiven0507/domestic-violence-in-colombia",
+        "raw_data.csv",
+        DOMESTIC_PATH,
+        "Cargando dataset de violencia intrafamiliar (575K registros)..."
+    )
     
     # Preprocesamiento
     df['fecha_hecho'] = pd.to_datetime(df['fecha_hecho'], dayfirst=True, format='mixed', errors='coerce')
