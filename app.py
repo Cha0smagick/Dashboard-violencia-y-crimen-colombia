@@ -483,7 +483,7 @@ def create_kpi_card(label: str, value: str, delta: str | None = None, delta_colo
 
 def plot_temporal_evolution(df: pd.DataFrame, date_col: str, value_col: str, 
                             title: str, group_col: str | None = None,
-                            freq: str = 'M') -> go.Figure:
+                            freq: str = 'ME') -> go.Figure:
     """Gráfico de evolución temporal con agregación."""
     if df.empty:
         return go.Figure().update_layout(
@@ -1015,7 +1015,7 @@ def render_temporal_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataF
             fig = plot_temporal_evolution(
                 df_delitos_f, 'fecha', 'cantidad',
                 'Evolución Mensual - Todos los Delitos',
-                freq='M'
+                freq='ME'
             )
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         
@@ -1025,7 +1025,7 @@ def render_temporal_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataF
             fig = plot_temporal_evolution(
                 vi_general, 'fecha', 'cantidad',
                 'Violencia Intrafamiliar (Dataset General)',
-                freq='M'
+                freq='ME'
             )
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         
@@ -1034,7 +1034,7 @@ def render_temporal_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataF
             fig = plot_temporal_evolution(
                 df_domestic_f, 'fecha_hecho', 'cantidad',
                 'Violencia Intrafamiliar (Dataset Específico)',
-                freq='M'
+                freq='ME'
             )
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     
