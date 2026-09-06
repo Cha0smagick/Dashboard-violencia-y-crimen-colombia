@@ -1,0 +1,36 @@
+# Configuración Streamlit - Dashboard Criminalidad Colombia
+# Maestría en Analítica de Datos - Politécnico Grancolombiano
+
+[server]
+headless = true
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8501
+
+[theme]
+primaryColor = "#35C4D9"        # Cyan
+backgroundColor = "#0B1026"     # Navy
+secondaryBackgroundColor = "#131A3A"  # Bg-light
+textColor = "#F5F7FF"           # White
+font = "Inter"
+
+[runner]
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+postScriptGC = true
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+[global]
+disableWatchdogWarning = true
+showWarningOnDirectExecution = false

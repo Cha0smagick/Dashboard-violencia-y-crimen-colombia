@@ -1,0 +1,16 @@
+# Dashboard Científico - Criminalidad y Violencia en Colombia
+# Maestría en Analítica de Datos - Politécnico Grancolombiano
+# Autor: Alejandro Quintero Ruiz
+
+# Core Data Science
+pandas>=2.1.0
+numpy>=1.24.0
+kagglehub>=0.3.0
+
+# Visualization
+plotly>=5.17.0
+streamlit>=1.28.0
+
+# Utilities
+python-dateutil>=2.8.0
+pytz>=2023.3
