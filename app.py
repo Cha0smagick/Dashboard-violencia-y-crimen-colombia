@@ -628,6 +628,73 @@ def plot_treemap(df: pd.DataFrame, path_cols: list, value_col: str, title: str) 
     return fig
 
 
+def plot_choropleth_colombia(df: pd.DataFrame, value_col: str, title: str,
+                              location_col: str = 'departamento_norm',
+                              color_scale: str = 'Viridis') -> go.Figure:
+    """Mapa coroplético de Colombia por departamento usando GeoJSON oficial DANE/IGAC."""
+    if df.empty:
+        return go.Figure().update_layout(template=PLOTLY_TEMPLATE, title=title)
+    
+    # GeoJSON oficial de Colombia (DANE/IGAC) - 32 departamentos
+    GEOJSON_URL = (
+        "https://gist.githubusercontent.com/john-guerra/"
+        "43c7656821069d00dcbc/raw/be6a6e239cd5b5b803c6e7c2ec405b793a9064dd/"
+        "Colombia.geo.json"
+    )
+    
+    # Agregar por departamento
+    df_map = df.groupby(location_col)[value_col].sum().reset_index()
+    
+    if df_map.empty:
+        return go.Figure().update_layout(template=PLOTLY_TEMPLATE, title=title)
+    
+    try:
+        fig = px.choropleth(
+            df_map,
+            geojson=GEOJSON_URL,
+            locations=location_col,
+            featureidkey="properties.NOMBRE_DPT",
+            color=value_col,
+            color_continuous_scale=color_scale,
+            scope="south america",
+            title=title,
+            template=PLOTLY_TEMPLATE,
+            labels={value_col: 'Casos', location_col: 'Departamento'},
+            hover_data={value_col: ':,.0f'},
+        )
+        
+        fig.update_geos(
+            fitbounds="locations",
+            visible=False,
+            showcountries=True,
+            countrycolor="rgba(255,255,255,0.2)",
+            showcoastlines=True,
+            coastlinecolor="rgba(255,255,255,0.3)",
+            showland=True,
+            landcolor="rgba(255,255,255,0.05)",
+            lataxis_range=[-5, 13],
+            lonaxis_range=[-82, -66],
+        )
+        
+        fig.update_layout(
+            title=dict(text=title, x=0.02, font=dict(size=14)),
+            template=PLOTLY_TEMPLATE,
+            margin=dict(t=50, l=0, r=0, b=0),
+            coloraxis_colorbar=dict(
+                title='Casos',
+                thickness=15,
+                len=0.8,
+            ),
+        )
+        
+        return fig
+        
+    except Exception as e:
+        # Fallback: barra simple si falla el mapa
+        st.warning(f"⚠️ No se pudo cargar el mapa: {e}. Mostrando gráfico de barras.")
+        return plot_top_categories(df, location_col.replace('_norm', ''), value_col, title, top_n=32)
+
+
 def plot_comparison_bars(df1: pd.DataFrame, df2: pd.DataFrame, 
                          cat_col: str, value_col: str,
                          label1: str, label2: str, title: str,
@@ -1095,7 +1162,7 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
         st.warning("⚠️ No hay datos geográficos para los filtros seleccionados.")
         return
     
-    tab1, tab2, tab3 = st.tabs(["🏆 Top Departamentos", "🌳 Composición (Treemap)", "🔍 Detalle Municipal"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🏆 Top Departamentos", "🌳 Composición (Treemap)", "🔍 Detalle Municipal", "🗺️ Mapa Interactivo"])
     
     with tab1:
         col1, col2 = st.columns(2)
@@ -1178,6 +1245,64 @@ def render_geographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.Dat
                         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                     else:
                         st.info(f"No hay datos de VI específica para {dep_sel} con los filtros actuales")
+
+
+    with tab4:
+        # Mapa coroplético de Colombia
+        st.markdown("#### 🗺️ Distribución Departamental (Mapa Coroplético)")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if not df_delitos_f.empty:
+                # Selector de métrica
+                metric_del = st.selectbox(
+                    "Métrica (Delitos Generales)",
+                    options=['cantidad', 'tipo'],
+                    format_func=lambda x: 'Total Casos' if x == 'cantidad' else 'Tipos de Delito',
+                    key="map_metric_del"
+                )
+                value_col = 'cantidad' if metric_del == 'cantidad' else 'tipo'
+                
+                fig = plot_choropleth_colombia(
+                    df_delitos_f, value_col,
+                    f'Distribución Departamental - Delitos Generales',
+                    location_col='departamento_norm',
+                    color_scale='Viridis'
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de delitos para los filtros actuales.")
+        
+        with col2:
+            if not df_domestic_f.empty:
+                metric_dom = st.selectbox(
+                    "Métrica (VI Específica)",
+                    options=['cantidad', 'armas_medios'],
+                    format_func=lambda x: 'Total Casos' if x == 'cantidad' else 'Armas/Medios',
+                    key="map_metric_dom"
+                )
+                value_col = 'cantidad' if metric_dom == 'cantidad' else 'armas_medios'
+                
+                fig = plot_choropleth_colombia(
+                    df_domestic_f, value_col,
+                    f'Distribución Departamental - VI Específica',
+                    location_col='departamento_norm',
+                    color_scale='Plasma'
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos de VI específica para los filtros actuales.")
+        
+        # Nota explicativa
+        st.markdown("""
+        <div class="info-box">
+            <h4>ℹ️ Acerca del Mapa</h4>
+            <p>Mapa coroplético basado en GeoJSON oficial DANE/IGAC (32 departamentos).</p>
+            <p>Los colores representan la intensidad de la métrica seleccionada por departamento.</p>
+            <p>Fuente geográfica: <a href="https://gist.githubusercontent.com/john-guerra/43c7656821069d00dcbc/raw/be6a6e239cd5b5b803c6e7c2ec405b793a9064dd/Colombia.geo.json" target="_blank">GeoJSON Colombia DANE/IGAC</a></p>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_demographic_analysis(df_delitos_f: pd.DataFrame, df_domestic_f: pd.DataFrame) -> None:
